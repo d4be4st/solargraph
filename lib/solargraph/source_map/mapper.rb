@@ -12,7 +12,7 @@ module Solargraph
 
       private_class_method :new
 
-      DIRECTIVE_REGEXP = /(@\!method|@\!attribute|@\!visibility|@\!domain|@\!macro|@\!parse|@\!override)/.freeze
+      DIRECTIVE_REGEXP = /(@\!method|@\!attribute|@\!visibility|@\!domain|@\!macro|@\!parse|@\!override|@\!scope)/.freeze
 
       # Generate the data.
       #
@@ -169,6 +169,27 @@ module Solargraph
               matches.each do |pin|
                 # @todo Smelly instance variable access
                 pin.instance_variable_set(:@visibility, kind)
+              end
+            end
+          end
+        when 'scope'
+          begin
+            kind = directive.tag.text&.to_sym
+            return unless [:class, :instance].include?(kind)
+
+            name = directive.tag.name
+            closure = closure_at(source_position) || @pins.first
+            if closure.location.range.start.line < comment_position.line
+              closure = closure_at(comment_position)
+            end
+            if closure.is_a?(Pin::Method) && no_empty_lines?(comment_position.line, source_position.line)
+              # @todo Smelly instance variable access
+              closure.instance_variable_set(:@scope, kind)
+            else
+              matches = pins.select{ |pin| pin.is_a?(Pin::Method) && pin.name == name && pin.namespace == namespace && pin.context.scope == namespace.is_a?(Pin::Singleton) ? :class : :instance }
+              matches.each do |pin|
+                # @todo Smelly instance variable access
+                pin.instance_variable_set(:@scope, kind)
               end
             end
           end

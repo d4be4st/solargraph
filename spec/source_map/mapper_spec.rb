@@ -269,6 +269,64 @@ describe Solargraph::SourceMap::Mapper do
     expect(pin.return_type.tag).to eq('String')
   end
 
+  it "processes class scope directives attached to methods" do
+    map = Solargraph::SourceMap.load_string(%(
+      class Foo
+        # @!scope class
+        def bar
+        end
+      end
+    ))
+    expect(map.first_pin('Foo.bar').scope).to be(:class)
+  end
+
+  it "processes instance scope directives attached to methods" do
+    map = Solargraph::SourceMap.load_string(%(
+      class Foo
+        # @!scope instance
+        def self.bar
+        end
+      end
+    ))
+    expect(map.first_pin('Foo#bar').scope).to be(:instance)
+  end
+
+  it "does not process attached scope directives on other methods" do
+    map = Solargraph::SourceMap.load_string(%(
+      class Example
+        # @!scope class
+        def method1; end
+
+        def method2; end
+      end
+    ))
+    method1 = map.first_pin('Example.method1')
+    expect(method1.scope).to be(:class)
+    method2 = map.first_pin('Example#method2')
+    expect(method2.scope).to be(:instance)
+  end
+
+  it "processes class-wide class scope directives" do
+    map = Solargraph::SourceMap.load_string(%(
+      class Example
+        # @!scope class
+
+        def method1; end
+
+        def method2; end
+
+        # @!scope instance
+        def method3; end
+      end
+    ))
+    method1 = map.first_pin('Example.method1')
+    expect(method1.scope).to be(:class)
+    method2 = map.first_pin('Example.method2')
+    expect(method2.scope).to be(:class)
+    method3 = map.first_pin('Example#method3')
+    expect(method3.scope).to be(:instance)
+  end
+
   it "finds assignment nodes for local variables using nil guards" do
     map = Solargraph::SourceMap.load_string(%(
       x ||= []
